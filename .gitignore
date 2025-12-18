@@ -9,3 +9,8 @@ local.properties
 # IDE
 .idea/
 *.iml
+
+# Internal documentation
+PROJECT_REQUIREMENTS.md
+ARCHITECTURE.md
+docs/
