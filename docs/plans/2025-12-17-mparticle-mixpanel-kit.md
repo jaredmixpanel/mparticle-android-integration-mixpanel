@@ -10,7 +10,42 @@
 
 ---
 
+## Context Reference Overview
+
+The `mparticle-kit-context/` directory contains all reference materials for this implementation. **Read the relevant CLAUDE.md files before starting each task.**
+
+### Directory Structure
+
+| Directory | Purpose | Priority |
+|-----------|---------|----------|
+| `mparticle-kit-context/CLAUDE.md` | Top-level navigation and implementation strategy | START HERE |
+| `example-kits/mparticle-apple-integration-mixpanel/` | **PRIMARY REFERENCE** - iOS Mixpanel Kit implementation | CRITICAL |
+| `example-kits/mparticle-android-integration-example/simple-kit/` | Android Kit skeleton and Gradle setup | HIGH |
+| `sdk-source-references/mixpanel-android/` | Mixpanel Android SDK API reference | HIGH |
+| `sdk-source-references/mparticle-android-sdk/android-kit-base/` | KitIntegration interfaces | MEDIUM |
+| `docs/` | mParticle Kit documentation | MEDIUM |
+
+### Key Reference Files
+
+| File | What It Shows |
+|------|---------------|
+| `example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` | iOS → Android API mapping guide |
+| `example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` | Complete iOS implementation (~387 lines) |
+| `example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/UserIdentificationType.swift` | User ID enum |
+| `example-kits/mparticle-android-integration-example/simple-kit/build.gradle` | Android Kit Gradle config |
+| `example-kits/mparticle-android-integration-example/simple-kit/src/main/kotlin/com/mparticle/kits/ExampleKit.kt` | Android Kit skeleton |
+| `sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` | Mixpanel API methods |
+| `sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` | Kit base class & interfaces |
+
+---
+
 ## Task 1: Project Setup
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/CLAUDE.md` - Gradle configuration patterns
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/simple-kit/build.gradle` - Build config template
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/LICENSE` - Apache 2.0 license template
+- `mparticle-kit-context/docs/android-kit-integration.md` - Android Kit integration guide
 
 **Files:**
 - Create: `settings.gradle.kts`
@@ -320,6 +355,10 @@ git add -A && git commit -m "chore: initialize project structure with Gradle, de
 
 ## Task 2: UserIdentificationType Enum
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - User ID enum specification
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/UserIdentificationType.swift` - iOS enum to replicate
+
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/UserIdentificationTypeTest.kt`
 - Create: `src/main/kotlin/com/mparticle/kits/UserIdentificationType.kt`
@@ -448,6 +487,13 @@ git add -A && git commit -m "feat: add UserIdentificationType enum"
 ---
 
 ## Task 3: MixpanelKit Core Structure with Started State
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/simple-kit/src/main/kotlin/com/mparticle/kits/ExampleKit.kt` - Android Kit skeleton
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Configuration keys (token, serverURL, etc.)
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - iOS implementation (lines 1-50)
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - Base class
+- `ARCHITECTURE.md` - "Check started state" best practice
 
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/MixpanelKitTest.kt`
@@ -592,6 +638,11 @@ git add -A && git commit -m "feat: add MixpanelKit skeleton with started state t
 
 ## Task 4: Kit Initialization - Token Validation
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `didFinishLaunching(withConfiguration:)` method
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/simple-kit/src/main/kotlin/com/mparticle/kits/ExampleKit.kt` - `onKitCreate` pattern
+- `ARCHITECTURE.md` - "Fail gracefully" principle
+
 **Files:**
 - Modify: `src/test/kotlin/com/mparticle/kits/MixpanelKitTest.kt`
 - Modify: `src/main/kotlin/com/mparticle/kits/MixpanelKit.kt`
@@ -665,6 +716,11 @@ git add -A && git commit -m "feat: add token and context validation in onKitCrea
 ---
 
 ## Task 5: Kit Initialization - Mixpanel SDK Setup
+
+**Context References:**
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/CLAUDE.md` - Mixpanel SDK overview
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `getInstance()`, `setServerURL()` methods
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - Configuration parsing (lines 50-100)
 
 **Files:**
 - Modify: `src/test/kotlin/com/mparticle/kits/MixpanelKitTest.kt`
@@ -799,6 +855,11 @@ git add -A && git commit -m "feat: implement Mixpanel SDK initialization with co
 
 ## Task 6: setOptOut Implementation
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Opt-Out API mapping table
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `optOutTracking()`, `optInTracking()` methods
+- `ARCHITECTURE.md` - "Fail gracefully" principle
+
 **Files:**
 - Modify: `src/test/kotlin/com/mparticle/kits/MixpanelKitTest.kt`
 - Modify: `src/main/kotlin/com/mparticle/kits/MixpanelKit.kt`
@@ -874,6 +935,12 @@ git add -A && git commit -m "feat: implement setOptOut with started state check"
 ---
 
 ## Task 7: EventListener Interface - logEvent
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Event Tracking API mapping table
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `logEvent(_:)` method
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `track()` method
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - `EventListener` interface
 
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/EventForwardingTest.kt`
@@ -1059,6 +1126,10 @@ git add -A && git commit -m "feat: implement EventListener.logEvent with started
 
 ## Task 8: EventListener Interface - logScreen
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Screen view "Viewed" prefix pattern
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `logScreen(_:)` method
+
 **Files:**
 - Modify: `src/test/kotlin/com/mparticle/kits/EventForwardingTest.kt`
 - Modify: `src/main/kotlin/com/mparticle/kits/MixpanelKit.kt`
@@ -1157,6 +1228,11 @@ git add -A && git commit -m "feat: implement EventListener.logScreen with 'Viewe
 ---
 
 ## Task 9: EventListener Interface - Error and Breadcrumb Methods
+
+**Context References:**
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - `logError`, `logException`, `leaveBreadcrumb` signatures
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `track()` for error events
+- `ARCHITECTURE.md` - "Fail gracefully" principle
 
 **Files:**
 - Modify: `src/test/kotlin/com/mparticle/kits/EventForwardingTest.kt`
@@ -1350,6 +1426,13 @@ git add -A && git commit -m "feat: implement logError, logException, and leaveBr
 ---
 
 ## Task 10: CommerceListener Interface - Purchase Events
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Commerce event handling pattern
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `logCommerceEvent(_:)` method
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `getPeople().trackCharge()` method
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - `CommerceListener` interface
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/CommerceEventUtils.java` - `expand()` for non-purchase events
 
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/CommerceTest.kt`
@@ -1557,6 +1640,12 @@ git add -A && git commit -m "feat: implement CommerceListener for purchase track
 ---
 
 ## Task 11: IdentityListener Interface
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Identity API mapping table and `extractUserId` logic
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `onIdentifyComplete`, `onLoginComplete`, `onLogoutComplete`, `onModifyComplete` methods
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `identify()`, `reset()` methods
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - `IdentityListener` interface
 
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/IdentityTest.kt`
@@ -1809,6 +1898,12 @@ git add -A && git commit -m "feat: implement IdentityListener for user identific
 ---
 
 ## Task 12: UserAttributeListener Interface
+
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - User Attributes API mapping table (People vs Super Properties modes)
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Sources/mParticle-Mixpanel/MPKitMixpanel.swift` - `onSetUserAttribute`, `onRemoveUserAttribute`, `incrementUserAttribute` methods
+- `mparticle-kit-context/sdk-source-references/mixpanel-android/src/main/java/com/mixpanel/android/mpmetrics/MixpanelAPI.java` - `getPeople().set()`, `getPeople().unset()`, `getPeople().increment()`, `registerSuperProperties()`, `unregisterSuperProperty()` methods
+- `mparticle-kit-context/sdk-source-references/mparticle-android-sdk/android-kit-base/src/main/java/com/mparticle/kits/KitIntegration.java` - `UserAttributeListener` interface
 
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/UserAttributeTest.kt`
@@ -2138,6 +2233,12 @@ git add -A && git commit -m "feat: implement UserAttributeListener for People an
 
 ## Task 13: Integration Test and Final Cleanup
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/Tests/mParticle-MixpanelTests/` - iOS test patterns to replicate
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/simple-kit/src/test/kotlin/com/mparticle/kits/KitTests.kt` - Android test patterns
+- `PROJECT_REQUIREMENTS.md` - Test coverage requirements (>80%)
+- `ARCHITECTURE.md` - Best practices to verify
+
 **Files:**
 - Create: `src/test/kotlin/com/mparticle/kits/IntegrationTest.kt`
 - Verify: `src/main/kotlin/com/mparticle/kits/MixpanelKit.kt` has all imports
@@ -2370,6 +2471,12 @@ git add -A && git commit -m "feat: add integration tests for complete Kit functi
 
 ## Task 14: Documentation and README
 
+**Context References:**
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/README.md` - iOS README format to follow
+- `mparticle-kit-context/example-kits/mparticle-android-integration-example/README.md` - Android README patterns
+- `mparticle-kit-context/docs/android-kit-integration.md` - Integration documentation format
+- `PROJECT_REQUIREMENTS.md` - Configuration options to document
+
 **Files:**
 - Create: `README.md`
 
@@ -2474,6 +2581,11 @@ git add README.md && git commit -m "docs: add README with setup and usage instru
 ---
 
 ## Task 15: Final Verification
+
+**Context References:**
+- `PROJECT_REQUIREMENTS.md` - Success criteria (>80% coverage, clean lint, <100ms init)
+- `ARCHITECTURE.md` - All best practices checklist
+- `mparticle-kit-context/example-kits/mparticle-apple-integration-mixpanel/CLAUDE.md` - Test coverage requirements from iOS
 
 **Files:**
 - Review all files
