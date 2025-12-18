@@ -50,7 +50,7 @@ class IntegrationTest {
     fun `initialization with valid token succeeds`() {
         kit.setMockMixpanelAPI(mockMixpanel)
         val settings = mapOf(
-            MixpanelKit.KEY_TOKEN to "test-token-12345"
+            KEY_TOKEN to "test-token-12345"
         )
         kit.onKitCreate(settings, mockContext)
         assertTrue(kit.isStarted)
@@ -61,10 +61,10 @@ class IntegrationTest {
     fun `initialization parses all configuration options`() {
         kit.setMockMixpanelAPI(mockMixpanel)
         val settings = mapOf(
-            MixpanelKit.KEY_TOKEN to "test-token",
-            MixpanelKit.KEY_SERVER_URL to "https://custom.mixpanel.com",
-            MixpanelKit.KEY_USER_ID_TYPE to "MPID",
-            MixpanelKit.KEY_USE_PEOPLE to "false"
+            KEY_TOKEN to "test-token",
+            KEY_SERVER_URL to "https://custom.mixpanel.com",
+            KEY_USER_ID_TYPE to "MPID",
+            KEY_USE_PEOPLE to "false"
         )
         kit.onKitCreate(settings, mockContext)
         assertTrue(kit.isStarted)
@@ -74,8 +74,8 @@ class IntegrationTest {
     fun `initialization with useMixpanelPeople true`() {
         kit.setMockMixpanelAPI(mockMixpanel)
         val settings = mapOf(
-            MixpanelKit.KEY_TOKEN to "test-token",
-            MixpanelKit.KEY_USE_PEOPLE to "true"
+            KEY_TOKEN to "test-token",
+            KEY_USE_PEOPLE to "true"
         )
         kit.onKitCreate(settings, mockContext)
         assertTrue(kit.isStarted)
@@ -312,9 +312,9 @@ class IntegrationTest {
     ) {
         kit.setMockMixpanelAPI(mockMixpanel)
         val settings = mapOf(
-            MixpanelKit.KEY_TOKEN to token,
-            MixpanelKit.KEY_USE_PEOPLE to usePeople.toString(),
-            MixpanelKit.KEY_USER_ID_TYPE to userIdType
+            KEY_TOKEN to token,
+            KEY_USE_PEOPLE to usePeople.toString(),
+            KEY_USER_ID_TYPE to userIdType
         )
         kit.onKitCreate(settings, mockContext)
     }

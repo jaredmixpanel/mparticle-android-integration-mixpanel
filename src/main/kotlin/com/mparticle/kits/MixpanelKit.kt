@@ -1,6 +1,7 @@
 package com.mparticle.kits
 
 import android.content.Context
+import android.util.Log
 import com.mixpanel.android.mpmetrics.MixpanelAPI
 import com.mparticle.MPEvent
 import com.mparticle.MParticle
@@ -52,36 +53,68 @@ open class MixpanelKit : KitIntegration(),
         settings: Map<String, String>?,
         context: Context?
     ): List<ReportingMessage> {
+        // Validate required parameters - let exceptions propagate for validation errors
         requireNotNull(context) { "Context is required" }
         val token = settings?.get(KEY_TOKEN)
         if (token.isNullOrEmpty()) {
             throw IllegalArgumentException("Mixpanel token is required")
         }
 
-        // Parse configuration settings
-        val serverURL = settings[KEY_SERVER_URL]?.takeIf { it.isNotEmpty() }
-        settings[KEY_USER_ID_TYPE]?.let { value ->
-            UserIdentificationType.fromValue(value)?.let { userIdentificationType = it }
-        }
-        settings[KEY_USE_PEOPLE]?.let { value ->
-            useMixpanelPeople = value.lowercase() == "true"
-        }
+        try {
+            Log.d(LOG_TAG, "onKitCreate()")
 
-        // Initialize Mixpanel SDK
-        mixpanelInstance = MixpanelAPI.getInstance(context, token, false)
-        serverURL?.let { mixpanelInstance?.setServerURL(it) }
+            // Parse configuration settings
+            val serverURL = settings[KEY_SERVER_URL]?.takeIf { it.isNotEmpty() }
+            settings[KEY_USER_ID_TYPE]?.let { value ->
+                UserIdentificationType.fromValue(value)?.let { userIdentificationType = it }
+            }
+            settings[KEY_USE_PEOPLE]?.let { value ->
+                useMixpanelPeople = value.lowercase() == "true"
+            }
 
-        _isStarted = true
-        return emptyList()
+            // Initialize Mixpanel SDK
+            mixpanelInstance = MixpanelAPI.getInstance(context, token, false)
+            serverURL?.let { mixpanelInstance?.setServerURL(it) }
+
+            _isStarted = true
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.APP_STATE_TRANSITION,
+                    System.currentTimeMillis(),
+                    null
+                )
+            )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onKitCreate(): ${t.message}", t)
+            return emptyList()
+        }
     }
 
     override fun setOptOut(optedOut: Boolean): List<ReportingMessage> {
-        if (!_isStarted) return emptyList()
-        val mixpanel = mixpanelInstance ?: return emptyList()
-        if (optedOut) {
-            mixpanel.optOutTracking()
-        } else {
-            mixpanel.optInTracking()
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "setOptOut(): Kit not started")
+                return emptyList()
+            }
+            val mixpanel = mixpanelInstance ?: return emptyList()
+            Log.d(LOG_TAG, "setOptOut(): optedOut=$optedOut")
+
+            if (optedOut) {
+                mixpanel.optOutTracking()
+            } else {
+                mixpanel.optInTracking()
+            }
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.OPT_OUT,
+                    System.currentTimeMillis(),
+                    null
+                )
+            )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "setOptOut(): ${t.message}", t)
         }
         return emptyList()
     }
@@ -91,53 +124,89 @@ open class MixpanelKit : KitIntegration(),
     // EventListener implementation
 
     override fun logEvent(event: MPEvent): List<ReportingMessage>? {
-        if (!_isStarted) return null
-        val mixpanel = mixpanelInstance ?: return null
-        val eventName = event.eventName
-        if (eventName.isNullOrEmpty()) return null
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "logEvent(MPEvent): Kit not started")
+                return null
+            }
+            val mixpanel = mixpanelInstance ?: return null
+            val eventName = event.eventName
+            if (eventName.isNullOrEmpty()) return null
 
-        mixpanel.track(eventName, convertToJSONObject(event.customAttributeStrings))
-        return listOf(ReportingMessage.fromEvent(this, event))
+            Log.d(LOG_TAG, "logEvent(MPEvent): $eventName")
+
+            // Build properties with event type (MoEngage pattern)
+            val properties = JSONObject()
+            properties.put(EVENT_TYPE_PROPERTY, event.eventType.toString())
+            event.customAttributeStrings?.forEach { (key, value) ->
+                properties.put(key, value)
+            }
+
+            mixpanel.track(eventName, properties)
+            return listOf(ReportingMessage.fromEvent(this, event))
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "logEvent(MPEvent): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     override fun logScreen(
         screenName: String?,
         screenAttributes: MutableMap<String, String>?
     ): List<ReportingMessage>? {
-        if (!_isStarted || screenName.isNullOrEmpty()) return null
-        val mixpanel = mixpanelInstance ?: return null
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "logScreen(): Kit not started")
+                return null
+            }
+            if (screenName.isNullOrEmpty()) return null
+            val mixpanel = mixpanelInstance ?: return null
 
-        mixpanel.track("Viewed $screenName", convertToJSONObject(screenAttributes))
-        return listOf(
-            ReportingMessage(
-                this,
-                ReportingMessage.MessageType.SCREEN_VIEW,
-                System.currentTimeMillis(),
-                screenAttributes
+            Log.d(LOG_TAG, "logScreen(): $screenName")
+            mixpanel.track("Viewed $screenName", convertToJSONObject(screenAttributes))
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.SCREEN_VIEW,
+                    System.currentTimeMillis(),
+                    screenAttributes
+                )
             )
-        )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "logScreen(): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     override fun logError(
         message: String?,
         errorAttributes: MutableMap<String, String>?
     ): List<ReportingMessage>? {
-        if (!_isStarted) return null
-        val mixpanel = mixpanelInstance ?: return null
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "logError(): Kit not started")
+                return null
+            }
+            val mixpanel = mixpanelInstance ?: return null
 
-        val props = JSONObject().apply {
-            put("error_message", message ?: "Unknown error")
-            errorAttributes?.forEach { (key, value) -> put(key, value) }
-        }
-        mixpanel.track("Error", props)
-        return listOf(
-            ReportingMessage(
-                this,
-                ReportingMessage.MessageType.ERROR,
-                System.currentTimeMillis(),
-                errorAttributes
+            Log.d(LOG_TAG, "logError(): $message")
+            val props = JSONObject().apply {
+                put("error_message", message ?: "Unknown error")
+                errorAttributes?.forEach { (key, value) -> put(key, value) }
+            }
+            mixpanel.track("Error", props)
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.ERROR,
+                    System.currentTimeMillis(),
+                    errorAttributes
+                )
             )
-        )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "logError(): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     override fun logException(
@@ -145,64 +214,93 @@ open class MixpanelKit : KitIntegration(),
         exceptionAttributes: MutableMap<String, String>?,
         message: String?
     ): List<ReportingMessage>? {
-        if (!_isStarted) return null
-        val mixpanel = mixpanelInstance ?: return null
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "logException(): Kit not started")
+                return null
+            }
+            val mixpanel = mixpanelInstance ?: return null
 
-        val props = JSONObject().apply {
-            put("exception_message", message ?: exception?.message ?: "Unknown exception")
-            put("exception_class", exception?.javaClass?.name ?: "Unknown")
-            exceptionAttributes?.forEach { (key, value) -> put(key, value) }
-        }
-        mixpanel.track("Exception", props)
-        return listOf(
-            ReportingMessage(
-                this,
-                ReportingMessage.MessageType.ERROR,
-                System.currentTimeMillis(),
-                exceptionAttributes
+            Log.d(LOG_TAG, "logException(): ${exception?.javaClass?.name}")
+            val props = JSONObject().apply {
+                put("exception_message", message ?: exception?.message ?: "Unknown exception")
+                put("exception_class", exception?.javaClass?.name ?: "Unknown")
+                exceptionAttributes?.forEach { (key, value) -> put(key, value) }
+            }
+            mixpanel.track("Exception", props)
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.ERROR,
+                    System.currentTimeMillis(),
+                    exceptionAttributes
+                )
             )
-        )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "logException(): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     override fun leaveBreadcrumb(breadcrumb: String?): List<ReportingMessage>? {
-        if (!_isStarted || breadcrumb.isNullOrEmpty()) return null
-        val mixpanel = mixpanelInstance ?: return null
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "leaveBreadcrumb(): Kit not started")
+                return null
+            }
+            if (breadcrumb.isNullOrEmpty()) return null
+            val mixpanel = mixpanelInstance ?: return null
 
-        val props = JSONObject().apply {
-            put("breadcrumb", breadcrumb)
-        }
-        mixpanel.track("Breadcrumb", props)
-        return listOf(
-            ReportingMessage(
-                this,
-                ReportingMessage.MessageType.BREADCRUMB,
-                System.currentTimeMillis(),
-                null
+            Log.d(LOG_TAG, "leaveBreadcrumb(): $breadcrumb")
+            val props = JSONObject().apply {
+                put("breadcrumb", breadcrumb)
+            }
+            mixpanel.track("Breadcrumb", props)
+            return listOf(
+                ReportingMessage(
+                    this,
+                    ReportingMessage.MessageType.BREADCRUMB,
+                    System.currentTimeMillis(),
+                    null
+                )
             )
-        )
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "leaveBreadcrumb(): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     // CommerceListener implementation
 
     override fun logEvent(event: CommerceEvent): List<ReportingMessage>? {
-        if (!_isStarted) return null
-        val mixpanel = mixpanelInstance ?: return null
-
-        // Expand all commerce events (including purchases) to regular events
-        // Note: trackCharge is deprecated by Mixpanel - commerce events should be tracked as regular events
-        val messages = mutableListOf<ReportingMessage>()
-        val expandedEvents = CommerceEventUtils.expand(event)
-
-        expandedEvents?.forEach { expandedEvent ->
-            val eventName = expandedEvent.eventName
-            if (!eventName.isNullOrEmpty()) {
-                val properties = buildCommerceEventProperties(expandedEvent, event)
-                mixpanel.track(eventName, properties)
-                messages.add(ReportingMessage.fromEvent(this, expandedEvent))
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "logEvent(CommerceEvent): Kit not started")
+                return null
             }
-        }
+            val mixpanel = mixpanelInstance ?: return null
 
-        return messages.ifEmpty { null }
+            Log.d(LOG_TAG, "logEvent(CommerceEvent): ${event.productAction}")
+
+            // Expand all commerce events (including purchases) to regular events
+            // Note: trackCharge is deprecated by Mixpanel - commerce events should be tracked as regular events
+            val messages = mutableListOf<ReportingMessage>()
+            val expandedEvents = CommerceEventUtils.expand(event)
+
+            expandedEvents?.forEach { expandedEvent ->
+                val eventName = expandedEvent.eventName
+                if (!eventName.isNullOrEmpty()) {
+                    val properties = buildCommerceEventProperties(expandedEvent, event)
+                    mixpanel.track(eventName, properties)
+                    messages.add(ReportingMessage.fromEvent(this, expandedEvent))
+                }
+            }
+
+            return messages.ifEmpty { null }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "logEvent(CommerceEvent): ${t.message}", t)
+        }
+        return emptyList()
     }
 
     /**
@@ -253,37 +351,87 @@ open class MixpanelKit : KitIntegration(),
         user: MParticleUser?,
         request: FilteredIdentityApiRequest?
     ) {
-        if (_isStarted) identifyUser(user)
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onIdentifyCompleted(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onIdentifyCompleted()")
+            identifyUser(user)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onIdentifyCompleted(): ${t.message}", t)
+        }
     }
 
     override fun onLoginCompleted(
         user: MParticleUser?,
         request: FilteredIdentityApiRequest?
     ) {
-        if (_isStarted) identifyUser(user)
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onLoginCompleted(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onLoginCompleted()")
+            identifyUser(user)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onLoginCompleted(): ${t.message}", t)
+        }
     }
 
     override fun onLogoutCompleted(
         user: MParticleUser?,
         request: FilteredIdentityApiRequest?
     ) {
-        if (_isStarted) mixpanelInstance?.reset()
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onLogoutCompleted(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onLogoutCompleted()")
+            mixpanelInstance?.reset()
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onLogoutCompleted(): ${t.message}", t)
+        }
     }
 
     override fun onModifyCompleted(
         user: MParticleUser?,
         request: FilteredIdentityApiRequest?
     ) {
-        if (_isStarted) identifyUser(user)
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onModifyCompleted(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onModifyCompleted()")
+            identifyUser(user)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onModifyCompleted(): ${t.message}", t)
+        }
     }
 
     override fun onUserIdentified(user: MParticleUser?) {
-        if (_isStarted) identifyUser(user)
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onUserIdentified(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onUserIdentified()")
+            identifyUser(user)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onUserIdentified(): ${t.message}", t)
+        }
     }
 
     private fun identifyUser(user: MParticleUser?) {
-        val userId = extractUserId(user) ?: return
-        mixpanelInstance?.identify(userId)
+        try {
+            val userId = extractUserId(user) ?: return
+            Log.d(LOG_TAG, "identifyUser(): $userId")
+            mixpanelInstance?.identify(userId)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "identifyUser(): ${t.message}", t)
+        }
     }
 
     private fun extractUserId(user: MParticleUser?): String? {
@@ -305,24 +453,42 @@ open class MixpanelKit : KitIntegration(),
         value: Any?,
         user: FilteredMParticleUser?
     ) {
-        if (!_isStarted || key.isNullOrEmpty() || value == null) return
-        val mixpanel = mixpanelInstance ?: return
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onSetUserAttribute(): Kit not started")
+                return
+            }
+            if (key.isNullOrEmpty() || value == null) return
+            val mixpanel = mixpanelInstance ?: return
 
-        if (useMixpanelPeople) {
-            mixpanel.people.set(key, value)
-        } else {
-            mixpanel.registerSuperProperties(JSONObject().apply { put(key, value) })
+            Log.d(LOG_TAG, "onSetUserAttribute(): $key")
+            if (useMixpanelPeople) {
+                mixpanel.people.set(key, value)
+            } else {
+                mixpanel.registerSuperProperties(JSONObject().apply { put(key, value) })
+            }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onSetUserAttribute(): ${t.message}", t)
         }
     }
 
     override fun onRemoveUserAttribute(key: String?, user: FilteredMParticleUser?) {
-        if (!_isStarted || key.isNullOrEmpty()) return
-        val mixpanel = mixpanelInstance ?: return
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onRemoveUserAttribute(): Kit not started")
+                return
+            }
+            if (key.isNullOrEmpty()) return
+            val mixpanel = mixpanelInstance ?: return
 
-        if (useMixpanelPeople) {
-            mixpanel.people.unset(key)
-        } else {
-            mixpanel.unregisterSuperProperty(key)
+            Log.d(LOG_TAG, "onRemoveUserAttribute(): $key")
+            if (useMixpanelPeople) {
+                mixpanel.people.unset(key)
+            } else {
+                mixpanel.unregisterSuperProperty(key)
+            }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onRemoveUserAttribute(): ${t.message}", t)
         }
     }
 
@@ -332,14 +498,29 @@ open class MixpanelKit : KitIntegration(),
         value: String?,
         user: FilteredMParticleUser?
     ) {
-        if (!_isStarted || key.isNullOrEmpty()) return
-        if (useMixpanelPeople) {
-            mixpanelInstance?.people?.increment(key, incrementedBy?.toDouble() ?: 0.0)
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onIncrementUserAttribute(): Kit not started")
+                return
+            }
+            if (key.isNullOrEmpty()) return
+
+            Log.d(LOG_TAG, "onIncrementUserAttribute(): $key by $incrementedBy")
+            if (useMixpanelPeople) {
+                mixpanelInstance?.people?.increment(key, incrementedBy?.toDouble() ?: 0.0)
+            }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onIncrementUserAttribute(): ${t.message}", t)
         }
     }
 
     override fun onSetUserTag(key: String?, user: FilteredMParticleUser?) {
-        onSetUserAttribute(key, true, user)
+        try {
+            Log.d(LOG_TAG, "onSetUserTag(): $key")
+            onSetUserAttribute(key, true, user)
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onSetUserTag(): ${t.message}", t)
+        }
     }
 
     override fun onSetUserAttributeList(
@@ -347,14 +528,23 @@ open class MixpanelKit : KitIntegration(),
         values: MutableList<String>?,
         user: FilteredMParticleUser?
     ) {
-        if (!_isStarted || key.isNullOrEmpty() || values.isNullOrEmpty()) return
-        val mixpanel = mixpanelInstance ?: return
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onSetUserAttributeList(): Kit not started")
+                return
+            }
+            if (key.isNullOrEmpty() || values.isNullOrEmpty()) return
+            val mixpanel = mixpanelInstance ?: return
 
-        val jsonArray = JSONArray(values)
-        if (useMixpanelPeople) {
-            mixpanel.people.set(key, jsonArray)
-        } else {
-            mixpanel.registerSuperProperties(JSONObject().apply { put(key, jsonArray) })
+            Log.d(LOG_TAG, "onSetUserAttributeList(): $key")
+            val jsonArray = JSONArray(values)
+            if (useMixpanelPeople) {
+                mixpanel.people.set(key, jsonArray)
+            } else {
+                mixpanel.registerSuperProperties(JSONObject().apply { put(key, jsonArray) })
+            }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onSetUserAttributeList(): ${t.message}", t)
         }
     }
 
@@ -363,8 +553,17 @@ open class MixpanelKit : KitIntegration(),
         attributeLists: MutableMap<String, MutableList<String>>?,
         user: FilteredMParticleUser?
     ) {
-        attributes?.forEach { (key, value) -> onSetUserAttribute(key, value, user) }
-        attributeLists?.forEach { (key, values) -> onSetUserAttributeList(key, values, user) }
+        try {
+            if (!_isStarted) {
+                Log.w(LOG_TAG, "onSetAllUserAttributes(): Kit not started")
+                return
+            }
+            Log.d(LOG_TAG, "onSetAllUserAttributes()")
+            attributes?.forEach { (key, value) -> onSetUserAttribute(key, value, user) }
+            attributeLists?.forEach { (key, values) -> onSetUserAttributeList(key, values, user) }
+        } catch (t: Throwable) {
+            Log.e(LOG_TAG, "onSetAllUserAttributes(): ${t.message}", t)
+        }
     }
 
     override fun supportsAttributeLists(): Boolean = true
@@ -375,6 +574,7 @@ open class MixpanelKit : KitIntegration(),
         user: FilteredMParticleUser?
     ) {
         // No-op: Mixpanel doesn't have a consent API that maps to mParticle's
+        Log.d(LOG_TAG, "onConsentStateUpdated(): No-op")
     }
 
     // Helper methods
@@ -386,11 +586,4 @@ open class MixpanelKit : KitIntegration(),
         }
     }
 
-    companion object {
-        const val NAME = "Mixpanel"
-        const val KEY_TOKEN = "token"
-        const val KEY_SERVER_URL = "serverURL"
-        const val KEY_USER_ID_TYPE = "userIdentificationType"
-        const val KEY_USE_PEOPLE = "useMixpanelPeople"
-    }
 }

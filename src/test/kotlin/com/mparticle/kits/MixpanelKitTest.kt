@@ -44,7 +44,7 @@ class MixpanelKitTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun `onKitCreate throws when token is empty`() {
-        val settings = mutableMapOf(MixpanelKit.KEY_TOKEN to "")
+        val settings = mutableMapOf(KEY_TOKEN to "")
         kit.onKitCreate(settings, mockContext)
     }
 
@@ -55,7 +55,7 @@ class MixpanelKitTest {
 
     @Test(expected = IllegalArgumentException::class)
     fun `onKitCreate throws when context is null`() {
-        val settings = mutableMapOf(MixpanelKit.KEY_TOKEN to "test-token")
+        val settings = mutableMapOf(KEY_TOKEN to "test-token")
         kit.onKitCreate(settings, null)
     }
 

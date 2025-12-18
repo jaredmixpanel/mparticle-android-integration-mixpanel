@@ -1,21 +1,31 @@
-package com.mparticle.kits
+package com.mparticle.kits.mocks
 
 import android.content.Context
 import com.mixpanel.android.mpmetrics.MixpanelAPI
 import com.mparticle.MPEvent
 import com.mparticle.commerce.CommerceEvent
+import com.mparticle.kits.CommerceEventUtils
+import com.mparticle.kits.EVENT_TYPE_PROPERTY
+import com.mparticle.kits.KEY_TOKEN
+import com.mparticle.kits.KEY_USE_PEOPLE
+import com.mparticle.kits.KEY_USER_ID_TYPE
+import com.mparticle.kits.MixpanelKit
+import com.mparticle.kits.ReportingMessage
+import com.mparticle.kits.UserIdentificationType
 import org.json.JSONObject
 
 /**
- * Test helper that exposes protected methods and allows mock injection for testing.
+ * Mock MixpanelKit for testing - bypasses real Mixpanel SDK initialization.
  * Overrides methods that create ReportingMessages to avoid null configuration issues in tests.
  */
-class TestableMixpanelKit : MixpanelKit() {
+class MockMixpanelKit : MixpanelKit() {
 
     private var mockMixpanelAPI: MixpanelAPI? = null
 
     fun setMockMixpanelAPI(mock: MixpanelAPI) {
         mockMixpanelAPI = mock
+        setMixpanelInstance(mock)
+        setStarted(true)
     }
 
     public override fun onKitCreate(
@@ -123,7 +133,6 @@ class TestableMixpanelKit : MixpanelKit() {
         val mixpanel = instance as? MixpanelAPI ?: return null
 
         // Expand all commerce events (including purchases) to regular events
-        // Note: trackCharge is deprecated by Mixpanel
         val expandedEvents = CommerceEventUtils.expand(event)
 
         expandedEvents?.forEach { expandedEvent ->
