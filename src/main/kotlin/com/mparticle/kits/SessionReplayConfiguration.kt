@@ -48,6 +48,7 @@ data class SessionReplayConfiguration(
                 enabled = settings[KEY_SESSION_REPLAY_ENABLED]?.lowercase() == "true",
                 recordSessionsPercent = settings[KEY_RECORD_SESSIONS_PERCENT]
                     ?.toDoubleOrNull()
+                    ?.takeIf { it.isFinite() }
                     ?.coerceIn(0.0, 100.0)
                     ?: 100.0,
                 autoStartRecording = settings[KEY_AUTO_START_RECORDING]?.lowercase() != "false",

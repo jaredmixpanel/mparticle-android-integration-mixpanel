@@ -659,6 +659,12 @@ open class MixpanelKit : KitIntegration(),
             val setMaskWebViews = configBuilderClass.getMethod("maskWebViews", Boolean::class.java)
             setMaskWebViews.invoke(builder, sessionReplayConfig.maskWebViews)
 
+            val setEnableLogging = configBuilderClass.getMethod("enableLogging", Boolean::class.java)
+            setEnableLogging.invoke(builder, sessionReplayConfig.enableLogging)
+
+            val setFlushInterval = configBuilderClass.getMethod("flushInterval", Int::class.java)
+            setFlushInterval.invoke(builder, sessionReplayConfig.flushIntervalSeconds)
+
             val buildMethod = configBuilderClass.getMethod("build")
             val config = buildMethod.invoke(builder)
 
