@@ -84,7 +84,7 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "onKitCreate()")
 
             // Parse configuration settings
-            val serverURL = settings[KEY_SERVER_URL]?.takeIf { it.isNotEmpty() }
+            val baseUrl = settings[KEY_BASE_URL]?.takeIf { it.isNotEmpty() }
             settings[KEY_USER_ID_TYPE]?.let { value ->
                 UserIdentificationType.fromValue(value)?.let { userIdentificationType = it }
             }
@@ -97,7 +97,7 @@ open class MixpanelKit : KitIntegration(),
 
             // Initialize Mixpanel SDK
             mixpanelInstance = MixpanelAPI.getInstance(context, token, false)
-            serverURL?.let { mixpanelInstance?.setServerURL(it) }
+            baseUrl?.let { mixpanelInstance?.setServerURL(it) }
 
             _isStarted = true
 

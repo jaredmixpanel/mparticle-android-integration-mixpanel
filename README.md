@@ -29,7 +29,7 @@ Configure the Mixpanel integration through the mParticle dashboard with the foll
 | Setting | Description |
 |---------|-------------|
 | `token` | **(Required)** Your Mixpanel project token |
-| `serverURL` | (Optional) Custom server URL for Mixpanel data |
+| `baseUrl` | (Optional) Custom server URL for Mixpanel data (maps to mParticle's "Mixpanel Target Server" setting) |
 | `userIdentificationType` | User ID type: `CustomerId`, `MPID`, `Other`, `Other2`, `Other3`, or `Other4` |
 | `useMixpanelPeople` | Enable Mixpanel People API for user attributes (default: `true`) |
 
