@@ -374,6 +374,15 @@ class IntegrationTest {
         verify(mockPeople, never()).unset(any())
     }
 
+    @Test
+    fun `onSetUserAttribute with usePeople false and reserved key calls registerSuperProperties`() {
+        initializeKit(usePeople = false)
+        val mockUser = mock(FilteredMParticleUser::class.java)
+        kit.onSetUserAttribute(MParticle.UserAttributes.FIRSTNAME, "John", mockUser)
+        verify(mockMixpanel).registerSuperProperties(any())
+        verify(mockPeople, never()).set(any<String>(), any())
+    }
+
     // MPID identity type test
 
     @Test
