@@ -462,10 +462,11 @@ open class MixpanelKit : KitIntegration(),
             val mixpanel = mixpanelInstance ?: return
 
             Log.d(LOG_TAG, "onSetUserAttribute(): $key")
+            val mappedKey = mapAttributeKey(key)
             if (useMixpanelPeople) {
-                mixpanel.people.set(key, value)
+                mixpanel.people.set(mappedKey, value)
             } else {
-                mixpanel.registerSuperProperties(JSONObject().apply { put(key, value) })
+                mixpanel.registerSuperProperties(JSONObject().apply { put(mappedKey, value) })
             }
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onSetUserAttribute(): ${t.message}", t)
@@ -482,10 +483,11 @@ open class MixpanelKit : KitIntegration(),
             val mixpanel = mixpanelInstance ?: return
 
             Log.d(LOG_TAG, "onRemoveUserAttribute(): $key")
+            val mappedKey = mapAttributeKey(key)
             if (useMixpanelPeople) {
-                mixpanel.people.unset(key)
+                mixpanel.people.unset(mappedKey)
             } else {
-                mixpanel.unregisterSuperProperty(key)
+                mixpanel.unregisterSuperProperty(mappedKey)
             }
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onRemoveUserAttribute(): ${t.message}", t)
@@ -506,8 +508,9 @@ open class MixpanelKit : KitIntegration(),
             if (key.isNullOrEmpty()) return
 
             Log.d(LOG_TAG, "onIncrementUserAttribute(): $key by $incrementedBy")
+            val mappedKey = mapAttributeKey(key)
             if (useMixpanelPeople) {
-                mixpanelInstance?.people?.increment(key, incrementedBy?.toDouble() ?: 0.0)
+                mixpanelInstance?.people?.increment(mappedKey, incrementedBy?.toDouble() ?: 0.0)
             }
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onIncrementUserAttribute(): ${t.message}", t)
@@ -537,11 +540,12 @@ open class MixpanelKit : KitIntegration(),
             val mixpanel = mixpanelInstance ?: return
 
             Log.d(LOG_TAG, "onSetUserAttributeList(): $key")
+            val mappedKey = mapAttributeKey(key)
             val jsonArray = JSONArray(values)
             if (useMixpanelPeople) {
-                mixpanel.people.set(key, jsonArray)
+                mixpanel.people.set(mappedKey, jsonArray)
             } else {
-                mixpanel.registerSuperProperties(JSONObject().apply { put(key, jsonArray) })
+                mixpanel.registerSuperProperties(JSONObject().apply { put(mappedKey, jsonArray) })
             }
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onSetUserAttributeList(): ${t.message}", t)
@@ -584,6 +588,32 @@ open class MixpanelKit : KitIntegration(),
         return JSONObject().apply {
             attributes.forEach { (key, value) -> put(key, value) }
         }
+    }
+
+    /**
+     * Maps an mParticle user attribute key to the corresponding Mixpanel reserved property key.
+     * If no mapping exists, returns the original key unchanged.
+     */
+    private fun mapAttributeKey(mParticleKey: String): String {
+        return RESERVED_ATTRIBUTE_MAP[mParticleKey] ?: mParticleKey
+    }
+
+    /**
+     * Maps mParticle user attribute keys to Mixpanel reserved profile property keys.
+     * See: https://docs.mixpanel.com/docs/data-structure/property-reference/reserved-properties
+     */
+    private companion object {
+        private val RESERVED_ATTRIBUTE_MAP: Map<String, String> = mapOf(
+            MParticle.UserAttributes.FIRSTNAME to "\$first_name",
+            MParticle.UserAttributes.LASTNAME to "\$last_name",
+            MParticle.UserAttributes.MOBILE_NUMBER to "\$phone",
+            MParticle.UserAttributes.GENDER to "\$gender",
+            MParticle.UserAttributes.CITY to "\$city",
+            MParticle.UserAttributes.STATE to "\$region",
+            MParticle.UserAttributes.COUNTRY to "\$country_code",
+            MParticle.UserAttributes.ZIPCODE to "\$zip",
+            "\$Email" to "\$email"
+        )
     }
 
 }
