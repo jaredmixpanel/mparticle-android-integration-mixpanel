@@ -62,7 +62,7 @@ class IntegrationTest {
         kit.setMockMixpanelAPI(mockMixpanel)
         val settings = mapOf(
             KEY_TOKEN to "test-token",
-            KEY_SERVER_URL to "https://custom.mixpanel.com",
+            KEY_BASE_URL to "https://custom.mixpanel.com",
             KEY_USER_ID_TYPE to "MPID",
             KEY_USE_PEOPLE to "false"
         )

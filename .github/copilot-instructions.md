@@ -31,7 +31,7 @@
 **Source**: `src/main/kotlin/com/mparticle/kits/`:
 - `MixpanelKit.kt` (589 lines) - Main kit, implements EventListener, CommerceListener, IdentityListener, UserAttributeListener
 - `UserIdentificationType.kt` (17 lines) - Enum: CUSTOMER_ID, MPID, OTHER, OTHER_2, OTHER_3, OTHER_4
-- `Constants.kt` (16 lines) - Config keys (KEY_TOKEN, KEY_SERVER_URL, KEY_USER_ID_TYPE, KEY_USE_PEOPLE), LOG_TAG
+- `Constants.kt` (16 lines) - Config keys (KEY_TOKEN, KEY_BASE_URL, KEY_USER_ID_TYPE, KEY_USE_PEOPLE), LOG_TAG
 
 **Tests**: `src/test/kotlin/com/mparticle/kits/`: MixpanelKitTest, EventForwardingTest, CommerceTest, IdentityTest, UserAttributeTest, ErrorHandlingTest, IntegrationTest (largest, 11K), UserIdentificationTypeTest, TestableMixpanelKit, TestDataProvider, mocks/.
 
@@ -45,7 +45,7 @@
 
 **Style**: Kotlin official style (`kotlin.code.style=official`). Minimal logging: DEBUG for operations, WARN for non-critical, ERROR for exceptions.
 
-**Configuration**: `onKitCreate()` receives settings map. Required: `token` (validates non-empty). Optional: `serverURL`, `userIdentificationType`, `useMixpanelPeople`.
+**Configuration**: `onKitCreate()` receives settings map. Required: `token` (validates non-empty). Optional: `baseUrl`, `userIdentificationType`, `useMixpanelPeople`.
 
 **Testing Pattern**: Extend `TestableMixpanelKit`, mock `Context`, use Robolectric for Android deps, test file: `{Feature}Test.kt`.
 

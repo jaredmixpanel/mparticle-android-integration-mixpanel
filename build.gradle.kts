@@ -32,7 +32,8 @@ android {
 
 dependencies {
     api("com.mparticle:android-kit-base:5.+")
-    api("com.mixpanel.android:mixpanel-android:7.+")
+    api("com.mixpanel.android:mixpanel-android:8.+")
+    compileOnly("com.mixpanel.android:mixpanel-android-session-replay:1.+")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.mockito:mockito-core:5.8.0")
     testImplementation("org.mockito.kotlin:mockito-kotlin:5.2.1")

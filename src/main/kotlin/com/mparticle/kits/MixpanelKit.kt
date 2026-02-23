@@ -28,6 +28,18 @@ open class MixpanelKit : KitIntegration(),
     private var useMixpanelPeople: Boolean = true
     private var userIdentificationType: UserIdentificationType = UserIdentificationType.CUSTOMER_ID
 
+    // Session Replay
+    private var sessionReplayConfig: SessionReplayConfiguration = SessionReplayConfiguration()
+
+    @Volatile
+    private var _sessionReplayInstance: Any? = null
+
+    /** Access to the underlying Session Replay SDK instance, if available. */
+    val sessionReplayInstance: Any? get() = _sessionReplayInstance
+
+    /** Whether Session Replay is enabled and initialized. */
+    val isSessionReplayEnabled: Boolean get() = sessionReplayConfig.enabled && _sessionReplayInstance != null
+
     val isStarted: Boolean get() = _isStarted
 
     // Protected setters for testing
@@ -47,6 +59,14 @@ open class MixpanelKit : KitIntegration(),
         userIdentificationType = type
     }
 
+    protected fun setSessionReplayConfig(config: SessionReplayConfiguration) {
+        sessionReplayConfig = config
+    }
+
+    protected fun setSessionReplayInstance(instance: Any?) {
+        _sessionReplayInstance = instance
+    }
+
     override fun getName(): String = NAME
 
     override fun onKitCreate(
@@ -64,7 +84,7 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "onKitCreate()")
 
             // Parse configuration settings
-            val serverURL = settings[KEY_SERVER_URL]?.takeIf { it.isNotEmpty() }
+            val baseUrl = settings[KEY_BASE_URL]?.takeIf { it.isNotEmpty() }
             settings[KEY_USER_ID_TYPE]?.let { value ->
                 UserIdentificationType.fromValue(value)?.let { userIdentificationType = it }
             }
@@ -72,11 +92,18 @@ open class MixpanelKit : KitIntegration(),
                 useMixpanelPeople = value.lowercase() == "true"
             }
 
+            // Parse Session Replay configuration
+            sessionReplayConfig = SessionReplayConfiguration.fromSettings(settings)
+
             // Initialize Mixpanel SDK
             mixpanelInstance = MixpanelAPI.getInstance(context, token, false)
-            serverURL?.let { mixpanelInstance?.setServerURL(it) }
+            baseUrl?.let { mixpanelInstance?.setServerURL(it) }
 
             _isStarted = true
+
+            // Initialize Session Replay if enabled
+            initializeSessionReplayIfEnabled(context, token)
+
             return listOf(
                 ReportingMessage(
                     this,
@@ -102,8 +129,12 @@ open class MixpanelKit : KitIntegration(),
 
             if (optedOut) {
                 mixpanel.optOutTracking()
+                stopSessionReplayRecording()
             } else {
                 mixpanel.optInTracking()
+                if (sessionReplayConfig.enabled && sessionReplayConfig.autoStartRecording) {
+                    startSessionReplayRecording()
+                }
             }
             return listOf(
                 ReportingMessage(
@@ -390,6 +421,7 @@ open class MixpanelKit : KitIntegration(),
             }
             Log.d(LOG_TAG, "onLogoutCompleted()")
             mixpanelInstance?.reset()
+            stopSessionReplayRecording()
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onLogoutCompleted(): ${t.message}", t)
         }
@@ -429,6 +461,7 @@ open class MixpanelKit : KitIntegration(),
             val userId = extractUserId(user) ?: return
             Log.d(LOG_TAG, "identifyUser(): $userId")
             mixpanelInstance?.identify(userId)
+            identifySessionReplay(userId)
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "identifyUser(): ${t.message}", t)
         }
@@ -612,5 +645,162 @@ open class MixpanelKit : KitIntegration(),
             MParticle.UserAttributes.COUNTRY to "\$country_code",
         )
     }
+    
+    // Session Replay methods
 
+    /**
+     * Initialize Session Replay if enabled and the SDK is available.
+     * Uses reflection to avoid ClassNotFoundException when the optional dependency is not present.
+     */
+    private fun initializeSessionReplayIfEnabled(context: Context, token: String) {
+        if (!sessionReplayConfig.enabled) {
+            Log.d(LOG_TAG, "Session Replay is disabled")
+            return
+        }
+
+        try {
+            // Check if Session Replay SDK is available
+            val sessionReplayClass = Class.forName("com.mixpanel.android.sessionreplay.MPSessionReplay")
+            val configClass = Class.forName("com.mixpanel.android.sessionreplay.models.MPSessionReplayConfig")
+            val autoMaskedViewClass = Class.forName("com.mixpanel.android.sessionreplay.sensitive_views.AutoMaskedView")
+
+            // Build autoMaskedViews set based on mask configuration
+            val autoMaskedViews = buildAutoMaskedViewsSet(autoMaskedViewClass)
+
+            // Create MPSessionReplayConfig using data class constructor
+            // Constructor params: wifiOnly, flushInterval, autoStartRecording, recordingSessionsPercent, autoMaskedViews, enableLogging
+            val configConstructor = configClass.getConstructor(
+                Boolean::class.java,      // wifiOnly
+                Long::class.java,         // flushInterval
+                Boolean::class.java,      // autoStartRecording
+                Double::class.java,       // recordingSessionsPercent
+                Set::class.java,          // autoMaskedViews
+                Boolean::class.java       // enableLogging
+            )
+
+            val config = configConstructor.newInstance(
+                sessionReplayConfig.wifiOnly,
+                sessionReplayConfig.flushIntervalSeconds.toLong(),
+                sessionReplayConfig.autoStartRecording,
+                sessionReplayConfig.recordSessionsPercent,
+                autoMaskedViews,
+                sessionReplayConfig.enableLogging
+            )
+
+            // Get the distinct ID from Mixpanel
+            val distinctId = mixpanelInstance?.distinctId ?: ""
+
+            // Initialize Session Replay
+            val initializeMethod = sessionReplayClass.getMethod(
+                "initialize",
+                Context::class.java,
+                String::class.java,
+                String::class.java,
+                configClass
+            )
+
+            _sessionReplayInstance = initializeMethod.invoke(null, context.applicationContext, token, distinctId, config)
+            Log.i(LOG_TAG, "Session Replay initialized successfully")
+
+        } catch (e: ClassNotFoundException) {
+            Log.w(LOG_TAG, "Session Replay SDK not available. Add 'com.mixpanel.android:mixpanel-android-session-replay' dependency to enable.", e)
+        } catch (e: NoSuchMethodException) {
+            Log.e(LOG_TAG, "Session Replay SDK API mismatch: ${e.message}", e)
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to initialize Session Replay: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Build autoMaskedViews set from boolean mask flags.
+     * Maps maskImages/maskText/maskWebViews to AutoMaskedView enum values.
+     */
+    private fun buildAutoMaskedViewsSet(autoMaskedViewClass: Class<*>): Set<Any> {
+        val result = mutableSetOf<Any>()
+
+        // Get enum constants: Text, Image, Web
+        val enumConstants = autoMaskedViewClass.enumConstants as Array<*>
+
+        for (constant in enumConstants) {
+            val name = (constant as Enum<*>).name
+            val shouldInclude = when (name) {
+                "Text" -> sessionReplayConfig.maskText
+                "Image" -> sessionReplayConfig.maskImages
+                "Web" -> sessionReplayConfig.maskWebViews
+                else -> false
+            }
+            if (shouldInclude) {
+                result.add(constant)
+            }
+        }
+
+        return result
+    }
+
+    /**
+     * Sync identity with Session Replay.
+     */
+    private fun identifySessionReplay(distinctId: String) {
+        val instance = _sessionReplayInstance ?: return
+
+        try {
+            val sessionReplayClass = instance.javaClass
+            val setDistinctIdMethod = sessionReplayClass.getMethod("setDistinctId", String::class.java)
+            setDistinctIdMethod.invoke(instance, distinctId)
+            Log.d(LOG_TAG, "Session Replay identity synced: $distinctId")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to sync Session Replay identity: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Start Session Replay recording.
+     */
+    fun startSessionReplayRecording() {
+        val instance = _sessionReplayInstance ?: return
+
+        try {
+            val sessionReplayClass = instance.javaClass
+            val startRecordingMethod = sessionReplayClass.getMethod("startRecording")
+            startRecordingMethod.invoke(instance)
+            Log.d(LOG_TAG, "Session Replay recording started")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to start Session Replay recording: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Stop Session Replay recording.
+     */
+    fun stopSessionReplayRecording() {
+        val instance = _sessionReplayInstance ?: return
+
+        try {
+            val sessionReplayClass = instance.javaClass
+            val stopRecordingMethod = sessionReplayClass.getMethod("stopRecording")
+            stopRecordingMethod.invoke(instance)
+            Log.d(LOG_TAG, "Session Replay recording stopped")
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to stop Session Replay recording: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Get the current Session Replay ID, if available.
+     *
+     * @return The session replay ID or null if not available
+     */
+    fun getSessionReplayId(): String? {
+        val instance = _sessionReplayInstance ?: return null
+
+        return try {
+            val sessionReplayClass = instance.javaClass
+            val getReplayIdMethod = sessionReplayClass.getMethod("getReplayId")
+            getReplayIdMethod.invoke(instance) as? String
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to get Session Replay ID: ${e.message}", e)
+            null
+        }
+    }
 }
+
