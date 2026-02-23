@@ -29,6 +29,7 @@ open class MixpanelKit : KitIntegration(),
     private var userIdentificationType: UserIdentificationType = UserIdentificationType.CUSTOMER_ID
 
     // Session Replay
+    @Volatile
     private var sessionReplayConfig: SessionReplayConfiguration = SessionReplayConfiguration()
 
     @Volatile
@@ -84,7 +85,8 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "onKitCreate()")
 
             // Parse configuration settings
-            val baseUrl = settings[KEY_BASE_URL]?.takeIf { it.isNotEmpty() }
+            @Suppress("DEPRECATION")
+            val baseUrl = (settings[KEY_BASE_URL] ?: settings[KEY_SERVER_URL])?.takeIf { it.isNotEmpty() }
             settings[KEY_USER_ID_TYPE]?.let { value ->
                 UserIdentificationType.fromValue(value)?.let { userIdentificationType = it }
             }
@@ -719,7 +721,7 @@ open class MixpanelKit : KitIntegration(),
         val result = mutableSetOf<Any>()
 
         // Get enum constants: Text, Image, Web
-        val enumConstants = autoMaskedViewClass.enumConstants as Array<*>
+        val enumConstants = autoMaskedViewClass.enumConstants as? Array<*> ?: return emptySet()
 
         for (constant in enumConstants) {
             val name = (constant as Enum<*>).name
@@ -747,7 +749,7 @@ open class MixpanelKit : KitIntegration(),
             val sessionReplayClass = instance.javaClass
             val setDistinctIdMethod = sessionReplayClass.getMethod("setDistinctId", String::class.java)
             setDistinctIdMethod.invoke(instance, distinctId)
-            Log.d(LOG_TAG, "Session Replay identity synced: $distinctId")
+            Log.d(LOG_TAG, "Session Replay identity synced")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to sync Session Replay identity: ${e.message}", e)
         }
@@ -757,6 +759,7 @@ open class MixpanelKit : KitIntegration(),
      * Start Session Replay recording.
      */
     fun startSessionReplayRecording() {
+        if (!_isStarted) return
         val instance = _sessionReplayInstance ?: return
 
         try {
@@ -773,6 +776,7 @@ open class MixpanelKit : KitIntegration(),
      * Stop Session Replay recording.
      */
     fun stopSessionReplayRecording() {
+        if (!_isStarted) return
         val instance = _sessionReplayInstance ?: return
 
         try {
@@ -791,6 +795,7 @@ open class MixpanelKit : KitIntegration(),
      * @return The session replay ID or null if not available
      */
     fun getSessionReplayId(): String? {
+        if (!_isStarted) return null
         val instance = _sessionReplayInstance ?: return null
 
         return try {
@@ -803,4 +808,3 @@ open class MixpanelKit : KitIntegration(),
         }
     }
 }
-

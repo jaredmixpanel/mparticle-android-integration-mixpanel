@@ -6,6 +6,8 @@ internal const val NAME = "Mixpanel"
 // Configuration keys (from mParticle dashboard settings)
 internal const val KEY_TOKEN = "token"
 internal const val KEY_BASE_URL = "baseUrl"
+@Deprecated("Use KEY_BASE_URL", replaceWith = ReplaceWith("KEY_BASE_URL"))
+internal const val KEY_SERVER_URL = "serverURL"
 internal const val KEY_USER_ID_TYPE = "userIdentificationType"
 internal const val KEY_USE_PEOPLE = "useMixpanelPeople"
 

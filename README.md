@@ -14,7 +14,7 @@ dependencies {
     implementation 'com.mparticle:android-mixpanel-kit:5+'
 
     // Optional: Add Session Replay SDK for session recording
-    implementation 'com.mixpanel.android:mixpanel-android-session-replay:0.+'
+    implementation 'com.mixpanel.android:mixpanel-android-session-replay:1.+'
 }
 ```
 
