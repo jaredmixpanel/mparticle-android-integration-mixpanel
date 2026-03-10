@@ -35,6 +35,9 @@ open class MixpanelKit : KitIntegration(),
     @Volatile
     private var _sessionReplayInstance: Any? = null
 
+    @Volatile
+    private var wasManuallyStoppedBeforeOptOut: Boolean = false
+
     /** Access to the underlying Session Replay SDK instance, if available. */
     val sessionReplayInstance: Any? get() = _sessionReplayInstance
 
@@ -66,6 +69,10 @@ open class MixpanelKit : KitIntegration(),
 
     protected fun setSessionReplayInstance(instance: Any?) {
         _sessionReplayInstance = instance
+    }
+
+    protected fun setWasManuallyStoppedBeforeOptOut(value: Boolean) {
+        wasManuallyStoppedBeforeOptOut = value
     }
 
     override fun getName(): String = NAME
@@ -130,13 +137,25 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "setOptOut(): optedOut=$optedOut")
 
             if (optedOut) {
+                // Check if recording was manually stopped before opt-out
+                if (_sessionReplayInstance != null && !isSessionReplayRecording()) {
+                    wasManuallyStoppedBeforeOptOut = true
+                }
                 mixpanel.optOutTracking()
                 stopSessionReplayRecording()
             } else {
                 mixpanel.optInTracking()
-                if (sessionReplayConfig.enabled && sessionReplayConfig.autoStartRecording) {
+                if (sessionReplayConfig.enabled && sessionReplayConfig.autoStartRecording
+                    && !wasManuallyStoppedBeforeOptOut
+                ) {
+                    // Sync identity before restarting — distinctId may have changed while opted out
+                    val currentDistinctId = mixpanel.distinctId
+                    if (!currentDistinctId.isNullOrEmpty()) {
+                        identifySessionReplay(currentDistinctId)
+                    }
                     startSessionReplayRecording()
                 }
+                wasManuallyStoppedBeforeOptOut = false
             }
             return listOf(
                 ReportingMessage(
@@ -407,6 +426,10 @@ open class MixpanelKit : KitIntegration(),
             }
             Log.d(LOG_TAG, "onLoginCompleted()")
             identifyUser(user)
+            // Restart recording for the new logged-in user if auto-start is enabled
+            if (sessionReplayConfig.enabled && sessionReplayConfig.autoStartRecording) {
+                startSessionReplayRecording()
+            }
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onLoginCompleted(): ${t.message}", t)
         }
@@ -424,6 +447,7 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "onLogoutCompleted()")
             mixpanelInstance?.reset()
             stopSessionReplayRecording()
+            wasManuallyStoppedBeforeOptOut = false
         } catch (t: Throwable) {
             Log.e(LOG_TAG, "onLogoutCompleted(): ${t.message}", t)
         }
@@ -752,6 +776,21 @@ open class MixpanelKit : KitIntegration(),
             Log.d(LOG_TAG, "Session Replay identity synced")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to sync Session Replay identity: ${e.message}", e)
+        }
+    }
+
+    /**
+     * Check if Session Replay is currently recording.
+     * Uses reflection to avoid compile-time dependency.
+     */
+    private fun isSessionReplayRecording(): Boolean {
+        val instance = _sessionReplayInstance ?: return false
+        return try {
+            val method = instance.javaClass.getMethod("isRecording")
+            method.invoke(instance) as? Boolean ?: false
+        } catch (e: Exception) {
+            Log.e(LOG_TAG, "Failed to check Session Replay recording state: ${e.message}", e)
+            false
         }
     }
 

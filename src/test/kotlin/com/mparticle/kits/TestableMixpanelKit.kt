@@ -18,6 +18,14 @@ class TestableMixpanelKit : MixpanelKit() {
         mockMixpanelAPI = mock
     }
 
+    fun setTestSessionReplayInstance(instance: Any?) {
+        setSessionReplayInstance(instance)
+    }
+
+    fun setTestWasManuallyStoppedBeforeOptOut(value: Boolean) {
+        setWasManuallyStoppedBeforeOptOut(value)
+    }
+
     public override fun onKitCreate(
         settings: Map<String, String>?,
         context: Context?
