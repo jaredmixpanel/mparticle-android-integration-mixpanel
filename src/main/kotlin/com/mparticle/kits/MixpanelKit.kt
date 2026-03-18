@@ -41,6 +41,8 @@ open class MixpanelKit : KitIntegration(),
     @Volatile
     private var wasManuallyStoppedBeforeOptOut: Boolean = false
 
+    private val sessionReplayInstanceLock = Any()
+
     /** Access to the underlying Session Replay SDK instance, if available. */
     val sessionReplayInstance: Any? get() = resolveSessionReplayInstance()
 
@@ -50,19 +52,23 @@ open class MixpanelKit : KitIntegration(),
     private fun resolveSessionReplayInstance(): Any? {
         _sessionReplayInstance?.let { return it }
         val srClass = _sessionReplayClass ?: return null
-        return try {
-            val companionField = srClass.getField("Companion")
-            val companion = companionField.get(null)
-            val getInstanceMethod = companion.javaClass.getMethod("getInstance")
-            val instance = getInstanceMethod.invoke(companion)
-            if (instance != null) {
-                _sessionReplayInstance = instance
-                Log.d(LOG_TAG, "Session Replay instance resolved (async init complete)")
+        synchronized(sessionReplayInstanceLock) {
+            // Double-check after acquiring lock (another thread may have resolved)
+            _sessionReplayInstance?.let { return it }
+            return try {
+                val companionField = srClass.getField("Companion")
+                val companion = companionField.get(null)
+                val getInstanceMethod = companion.javaClass.getMethod("getInstance")
+                val instance = getInstanceMethod.invoke(companion)
+                if (instance != null) {
+                    _sessionReplayInstance = instance
+                    Log.d(LOG_TAG, "Session Replay instance resolved (async init complete)")
+                }
+                instance
+            } catch (e: Exception) {
+                Log.d(LOG_TAG, "Session Replay instance not yet available: ${e.message}", e)
+                null
             }
-            instance
-        } catch (e: Exception) {
-            Log.d(LOG_TAG, "Session Replay instance not yet available: ${e.message}", e)
-            null
         }
     }
 
