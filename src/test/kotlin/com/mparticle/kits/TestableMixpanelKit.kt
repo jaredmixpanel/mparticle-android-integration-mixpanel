@@ -54,11 +54,7 @@ class TestableMixpanelKit : MixpanelKit() {
         // Use mock if available, otherwise call real SDK
         if (mockMixpanelAPI != null) {
             setMixpanelInstance(mockMixpanelAPI!!)
-
-            if (mockMixpanelAPI!!.hasOptedOutTracking()) {
-                mockMixpanelAPI!!.optInTracking()
-            }
-
+            clearStaleOptOutState()
             setStarted(true)
             return emptyList()
         }

@@ -129,6 +129,13 @@ open class MixpanelKit : KitIntegration(),
         wasManuallyStoppedBeforeOptOut = value
     }
 
+    protected fun clearStaleOptOutState() {
+        if (mixpanelInstance?.hasOptedOutTracking() == true) {
+            mixpanelInstance?.optInTracking()
+            Log.d(LOG_TAG, "onKitCreate(): cleared stale Mixpanel opt-out state")
+        }
+    }
+
     override fun getName(): String = NAME
 
     override fun onKitCreate(
@@ -164,10 +171,7 @@ open class MixpanelKit : KitIntegration(),
 
             // onKitCreate() is called both on first init and on opt-in (mParticle recreates the kit).
             // Mixpanel persists opt-out state, so clear it if stale from a previous opt-out cycle.
-            if (mixpanelInstance?.hasOptedOutTracking() == true) {
-                mixpanelInstance?.optInTracking()
-                Log.d(LOG_TAG, "onKitCreate(): cleared stale Mixpanel opt-out state")
-            }
+            clearStaleOptOutState()
 
             _isStarted = true
 
@@ -199,7 +203,8 @@ open class MixpanelKit : KitIntegration(),
 
             if (optedOut) {
                 // Check if recording was manually stopped before opt-out
-                if (resolveSessionReplayInstance() != null && !isSessionReplayRecording()) {
+                val srInstance = resolveSessionReplayInstance()
+                if (srInstance != null && !isSessionReplayRecording(srInstance)) {
                     wasManuallyStoppedBeforeOptOut = true
                 }
                 mixpanel.optOutTracking()
@@ -861,8 +866,8 @@ open class MixpanelKit : KitIntegration(),
      * Check if Session Replay is currently recording.
      * Uses reflection to avoid compile-time dependency.
      */
-    private fun isSessionReplayRecording(): Boolean {
-        val instance = resolveSessionReplayInstance() ?: return false
+    private fun isSessionReplayRecording(resolvedInstance: Any? = null): Boolean {
+        val instance = resolvedInstance ?: resolveSessionReplayInstance() ?: return false
         return try {
             val method = instance.javaClass.getMethod("isRecording")
             method.invoke(instance) as? Boolean ?: false
