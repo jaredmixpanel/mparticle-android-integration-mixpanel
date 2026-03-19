@@ -354,6 +354,22 @@ class IntegrationTest {
         verify(mockMixpanel).optInTracking()
     }
 
+    @Test
+    fun `onKitCreate clears stale opt-out state when hasOptedOutTracking is true`() {
+        `when`(mockMixpanel.hasOptedOutTracking()).thenReturn(true)
+        initializeKit()
+        verify(mockMixpanel).hasOptedOutTracking()
+        verify(mockMixpanel).optInTracking()
+    }
+
+    @Test
+    fun `onKitCreate does not call optInTracking when hasOptedOutTracking is false`() {
+        `when`(mockMixpanel.hasOptedOutTracking()).thenReturn(false)
+        initializeKit()
+        verify(mockMixpanel).hasOptedOutTracking()
+        verify(mockMixpanel, never()).optInTracking()
+    }
+
     // Super Properties Tests (useMixpanelPeople = false)
 
     @Test

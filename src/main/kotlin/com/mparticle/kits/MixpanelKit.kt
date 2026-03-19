@@ -63,10 +63,28 @@ open class MixpanelKit : KitIntegration(),
                 if (instance != null) {
                     _sessionReplayInstance = instance
                     Log.d(LOG_TAG, "Session Replay instance resolved (async init complete)")
+                } else {
+                    Log.d(LOG_TAG, "Session Replay instance not yet available (getInstance() returned null)")
                 }
                 instance
+            } catch (e: NoSuchFieldException) {
+                Log.w(
+                    LOG_TAG,
+                    "Session Replay integration error: Companion field not found on ${srClass.name}. Disabling Session Replay.",
+                    e
+                )
+                _sessionReplayClass = null
+                null
+            } catch (e: NoSuchMethodException) {
+                Log.w(
+                    LOG_TAG,
+                    "Session Replay integration error: getInstance() method not found on ${srClass.name}. Disabling Session Replay.",
+                    e
+                )
+                _sessionReplayClass = null
+                null
             } catch (e: Exception) {
-                Log.d(LOG_TAG, "Session Replay instance not yet available: ${e.message}", e)
+                Log.d(LOG_TAG, "Session Replay instance not yet available: ${e.message}")
                 null
             }
         }
@@ -96,6 +114,10 @@ open class MixpanelKit : KitIntegration(),
 
     protected fun setSessionReplayInstance(instance: Any?) {
         _sessionReplayInstance = instance
+    }
+
+    protected fun setSessionReplayClass(clazz: Class<*>?) {
+        _sessionReplayClass = clazz
     }
 
     protected fun setWasManuallyStoppedBeforeOptOut(value: Boolean) {
