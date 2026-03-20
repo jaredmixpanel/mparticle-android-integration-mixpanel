@@ -22,6 +22,10 @@ class TestableMixpanelKit : MixpanelKit() {
         setSessionReplayInstance(instance)
     }
 
+    fun setTestSessionReplayClass(clazz: Class<*>?) {
+        setSessionReplayClass(clazz)
+    }
+
     fun setTestWasManuallyStoppedBeforeOptOut(value: Boolean) {
         setWasManuallyStoppedBeforeOptOut(value)
     }
@@ -50,6 +54,7 @@ class TestableMixpanelKit : MixpanelKit() {
         // Use mock if available, otherwise call real SDK
         if (mockMixpanelAPI != null) {
             setMixpanelInstance(mockMixpanelAPI!!)
+            clearStaleOptOutState()
             setStarted(true)
             return emptyList()
         }

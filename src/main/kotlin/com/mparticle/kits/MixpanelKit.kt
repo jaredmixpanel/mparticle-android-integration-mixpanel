@@ -36,17 +36,67 @@ open class MixpanelKit : KitIntegration(),
     private var _sessionReplayInstance: Any? = null
 
     @Volatile
+    private var _sessionReplayClass: Class<*>? = null
+
+    @Volatile
     private var wasManuallyStoppedBeforeOptOut: Boolean = false
 
+    private val sessionReplayInstanceLock = Any()
+
     /** Access to the underlying Session Replay SDK instance, if available. */
-    val sessionReplayInstance: Any? get() = _sessionReplayInstance
+    val sessionReplayInstance: Any? get() = resolveSessionReplayInstance()
 
     /** Whether Session Replay is enabled and initialized. */
-    val isSessionReplayEnabled: Boolean get() = sessionReplayConfig.enabled && _sessionReplayInstance != null
+    val isSessionReplayEnabled: Boolean get() = sessionReplayConfig.enabled && resolveSessionReplayInstance() != null
+
+    private fun resolveSessionReplayInstance(): Any? {
+        _sessionReplayInstance?.let { return it }
+        val srClass = _sessionReplayClass ?: return null
+        synchronized(sessionReplayInstanceLock) {
+            // Double-check after acquiring lock (another thread may have resolved)
+            _sessionReplayInstance?.let { return it }
+            return try {
+                val companionField = srClass.getField("Companion")
+                val companion = companionField.get(null)
+                val getInstanceMethod = companion.javaClass.getMethod("getInstance")
+                val instance = getInstanceMethod.invoke(companion)
+                if (instance != null) {
+                    _sessionReplayInstance = instance
+                    Log.d(LOG_TAG, "Session Replay instance resolved (async init complete)")
+                } else {
+                    Log.d(LOG_TAG, "Session Replay instance not yet available (getInstance() returned null)")
+                }
+                instance
+            } catch (e: NoSuchFieldException) {
+                Log.w(
+                    LOG_TAG,
+                    "Session Replay integration error: Companion field not found on ${srClass.name}. Disabling Session Replay.",
+                    e
+                )
+                _sessionReplayClass = null
+                null
+            } catch (e: NoSuchMethodException) {
+                Log.w(
+                    LOG_TAG,
+                    "Session Replay integration error: getInstance() method not found on ${srClass.name}. Disabling Session Replay.",
+                    e
+                )
+                _sessionReplayClass = null
+                null
+            } catch (e: Exception) {
+                Log.e(
+                    LOG_TAG,
+                    "Session Replay integration error while resolving instance. Disabling Session Replay.",
+                    e
+                )
+                _sessionReplayClass = null
+                null
+            }
+        }
+    }
 
     val isStarted: Boolean get() = _isStarted
 
-    // Protected setters for testing
     protected fun setMixpanelInstance(instance: MixpanelAPI) {
         mixpanelInstance = instance
     }
@@ -71,8 +121,19 @@ open class MixpanelKit : KitIntegration(),
         _sessionReplayInstance = instance
     }
 
+    protected fun setSessionReplayClass(clazz: Class<*>?) {
+        _sessionReplayClass = clazz
+    }
+
     protected fun setWasManuallyStoppedBeforeOptOut(value: Boolean) {
         wasManuallyStoppedBeforeOptOut = value
+    }
+
+    protected fun clearStaleOptOutState() {
+        if (mixpanelInstance?.hasOptedOutTracking() == true) {
+            mixpanelInstance?.optInTracking()
+            Log.d(LOG_TAG, "onKitCreate(): cleared stale Mixpanel opt-out state")
+        }
     }
 
     override fun getName(): String = NAME
@@ -108,6 +169,10 @@ open class MixpanelKit : KitIntegration(),
             mixpanelInstance = MixpanelAPI.getInstance(context, token, false)
             baseUrl?.let { mixpanelInstance?.setServerURL(it) }
 
+            // onKitCreate() is called both on first init and on opt-in (mParticle recreates the kit).
+            // Mixpanel persists opt-out state, so clear it if stale from a previous opt-out cycle.
+            clearStaleOptOutState()
+
             _isStarted = true
 
             // Initialize Session Replay if enabled
@@ -138,7 +203,8 @@ open class MixpanelKit : KitIntegration(),
 
             if (optedOut) {
                 // Check if recording was manually stopped before opt-out
-                if (_sessionReplayInstance != null && !isSessionReplayRecording()) {
+                val srInstance = resolveSessionReplayInstance()
+                if (srInstance != null && !isSessionReplayRecording(srInstance)) {
                     wasManuallyStoppedBeforeOptOut = true
                 }
                 mixpanel.optOutTracking()
@@ -725,8 +791,23 @@ open class MixpanelKit : KitIntegration(),
                 configClass
             )
 
-            _sessionReplayInstance = initializeMethod.invoke(null, context.applicationContext, token, distinctId, config)
-            Log.i(LOG_TAG, "Session Replay initialized successfully")
+            initializeMethod.invoke(null, context.applicationContext, token, distinctId, config)
+            _sessionReplayClass = sessionReplayClass
+            resolveSessionReplayInstance()
+
+            val instanceResolved = _sessionReplayInstance != null
+            val integrationDisabled = _sessionReplayClass == null && !instanceResolved
+            when {
+                instanceResolved -> {
+                    Log.i(LOG_TAG, "Session Replay initialized, instance resolved synchronously")
+                }
+                integrationDisabled -> {
+                    Log.w(LOG_TAG, "Session Replay initialization attempted, but integration was disabled due to reflection/API mismatch; instance will not be resolved lazily")
+                }
+                else -> {
+                    Log.i(LOG_TAG, "Session Replay initialized, instance not yet available (will resolve lazily if Session Replay completes async init)")
+                }
+            }
 
         } catch (e: ClassNotFoundException) {
             Log.w(LOG_TAG, "Session Replay SDK not available. Add 'com.mixpanel.android:mixpanel-android-session-replay' dependency to enable.", e)
@@ -734,6 +815,8 @@ open class MixpanelKit : KitIntegration(),
             Log.e(LOG_TAG, "Session Replay SDK API mismatch: ${e.message}", e)
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to initialize Session Replay: ${e.message}", e)
+            _sessionReplayClass = null
+            _sessionReplayInstance = null
         }
     }
 
@@ -767,12 +850,12 @@ open class MixpanelKit : KitIntegration(),
      * Sync identity with Session Replay.
      */
     private fun identifySessionReplay(distinctId: String) {
-        val instance = _sessionReplayInstance ?: return
+        val instance = resolveSessionReplayInstance() ?: return
 
         try {
             val sessionReplayClass = instance.javaClass
-            val setDistinctIdMethod = sessionReplayClass.getMethod("setDistinctId", String::class.java)
-            setDistinctIdMethod.invoke(instance, distinctId)
+            val identifyMethod = sessionReplayClass.getMethod("identify", String::class.java)
+            identifyMethod.invoke(instance, distinctId)
             Log.d(LOG_TAG, "Session Replay identity synced")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to sync Session Replay identity: ${e.message}", e)
@@ -783,8 +866,8 @@ open class MixpanelKit : KitIntegration(),
      * Check if Session Replay is currently recording.
      * Uses reflection to avoid compile-time dependency.
      */
-    private fun isSessionReplayRecording(): Boolean {
-        val instance = _sessionReplayInstance ?: return false
+    private fun isSessionReplayRecording(resolvedInstance: Any? = null): Boolean {
+        val instance = resolvedInstance ?: resolveSessionReplayInstance() ?: return false
         return try {
             val method = instance.javaClass.getMethod("isRecording")
             method.invoke(instance) as? Boolean ?: false
@@ -799,12 +882,12 @@ open class MixpanelKit : KitIntegration(),
      */
     fun startSessionReplayRecording() {
         if (!_isStarted) return
-        val instance = _sessionReplayInstance ?: return
+        val instance = resolveSessionReplayInstance() ?: return
 
         try {
             val sessionReplayClass = instance.javaClass
-            val startRecordingMethod = sessionReplayClass.getMethod("startRecording")
-            startRecordingMethod.invoke(instance)
+            val startRecordingMethod = sessionReplayClass.getMethod("startRecording", Double::class.javaPrimitiveType)
+            startRecordingMethod.invoke(instance, sessionReplayConfig.recordSessionsPercent)
             Log.d(LOG_TAG, "Session Replay recording started")
         } catch (e: Exception) {
             Log.e(LOG_TAG, "Failed to start Session Replay recording: ${e.message}", e)
@@ -816,7 +899,7 @@ open class MixpanelKit : KitIntegration(),
      */
     fun stopSessionReplayRecording() {
         if (!_isStarted) return
-        val instance = _sessionReplayInstance ?: return
+        val instance = resolveSessionReplayInstance() ?: return
 
         try {
             val sessionReplayClass = instance.javaClass
@@ -835,7 +918,7 @@ open class MixpanelKit : KitIntegration(),
      */
     fun getSessionReplayId(): String? {
         if (!_isStarted) return null
-        val instance = _sessionReplayInstance ?: return null
+        val instance = resolveSessionReplayInstance() ?: return null
 
         return try {
             val sessionReplayClass = instance.javaClass
