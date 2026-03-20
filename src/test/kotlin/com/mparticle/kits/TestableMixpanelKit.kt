@@ -18,6 +18,18 @@ class TestableMixpanelKit : MixpanelKit() {
         mockMixpanelAPI = mock
     }
 
+    fun setTestSessionReplayInstance(instance: Any?) {
+        setSessionReplayInstance(instance)
+    }
+
+    fun setTestSessionReplayClass(clazz: Class<*>?) {
+        setSessionReplayClass(clazz)
+    }
+
+    fun setTestWasManuallyStoppedBeforeOptOut(value: Boolean) {
+        setWasManuallyStoppedBeforeOptOut(value)
+    }
+
     public override fun onKitCreate(
         settings: Map<String, String>?,
         context: Context?
@@ -36,9 +48,13 @@ class TestableMixpanelKit : MixpanelKit() {
             setUseMixpanelPeople(value.lowercase() == "true")
         }
 
+        // Parse Session Replay configuration
+        setSessionReplayConfig(SessionReplayConfiguration.fromSettings(settings))
+
         // Use mock if available, otherwise call real SDK
         if (mockMixpanelAPI != null) {
             setMixpanelInstance(mockMixpanelAPI!!)
+            clearStaleOptOutState()
             setStarted(true)
             return emptyList()
         }
